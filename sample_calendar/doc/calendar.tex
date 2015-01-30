@@ -1,0 +1,81 @@
+\documentclass[a4paper, 12pt]{article}
+
+\begin{document}
+
+\section{Overview}
+This Calendar Implementation includes levels. Calendar Application
+components and Chord beneath them. {\it Calendar Manager}s reside in
+arbitary node and accept connection from {\it Client}s. {\it Calendar
+  Manager}s communicate with each other through {\it Chord}, which can
+deal with routing or partial failure recovery. {\it Calendar Manager}s
+are responsible to distribute {\it Calendar}s in balance and help {\it
+  Client}s find their own {\it Calendar}s. 
+
+
+\section{Chord}
+
+{\it Chord} uses its {\it Finger Table} as partial route table and
+keeps its predecessor and successor of successor for correctness. So
+more than successive two node failures are out of responsibility in
+this implementation. For simplicity, one-to-one map scheme is applied
+on hashing medusa 19 nodes. 
+
+
+\section{Replication}
+Replication happens at Application level, which is handled by {\it
+  Calendar Manager}s. Each {\it Calendar} Object is hashed to 0-19 and
+distributed to corresponding node, which is {\it primary copy}. {\it
+  secondary copy} is hold by the successor node. For correctness and
+availability, 1) A new node tries to pull {\it Calendar}s which should
+belong to it from its successor once it joins the {\it Chord}. And 2)
+Every Calendar Manager checks if its Calendars are {\it primary copy},
+{\it secondary copy} or neither. For primary copy, it should update
+itself to its successor. For secondary copy, do nothing. Otherwise
+{\it Calendar Manager}s deletes this {\it Calendar} object. 
+
+
+\section{Failure Detection}
+{\it Client} explicitly connects to one {\it Calendar Manager} via its
+address, then retrieves its {\it Calendar} stub. The {\it Client}
+detects if both {\it Calendar Manager} and {\it Calendar} are not
+alive periodically. Only {\it Calendar Manager} failure asks {\it
+  Client} to do reconnection explicityly and new {\it Calendar} stub
+, which is originally secondary copy, would be automatically sent back
+if {\it Calendar Manager} is alive. 
+
+{\it Calendar Manager}s do not handle peers failures, which is
+corrected implicitly by {\it Chord}. Details are in section 2.
+
+{\it Calendar Manager}s explicitly detect if Clients which have
+connected to it are alive. Then server decides if send notification of
+expiring Event to them.
+
+\section{Deadlock Avoidance}
+While do Group Event schedule/deletion/update, global sequence is
+under consideration for deadlock avoidance. Before these operations,
+Coordinator, the {\it Calendar} who start transaction, aquires locks in
+ascending order of participants' ID and releases locks in descending
+order. 
+
+\section{Distributed Commit Protocol}
+Group Event schedule/deletion/update are also considered as
+automatic. 
+
+For schedule, after locking all relevant {\it Calendar}s, potential
+conflict between this group event and existing events is checked
+through all {\it Calendar}s. If everything is OK, the second phase, is
+then do schedule. Failure in the first phase affects nothing, but
+coordinator has to rollback all insertion done if failure happens in
+second phase. 
+
+Update is composed of two sub-transaction: deletion of old event and
+insertion of new event. Once deletion is done, re-insertion of old
+event is required if any failure happens. 
+
+This scheme can not handle the case of coordinator failure. Once the
+coordinator is down, whole system has to bear inconsistency and
+deadlock.
+
+
+
+\end{document}
